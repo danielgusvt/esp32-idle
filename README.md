@@ -38,3 +38,30 @@ the link as native USB, and the stub upload over the 115200 baud UART fails.
 The C5 has no line to the ESP32's EN or BOOT pins, so use the buttons for
 resets that change the boot mode. A JTAG reset is a software reset and keeps
 the boot mode latched at the last EN press.
+
+## Debug with GDB
+
+Start OpenOCD in one terminal and leave it running:
+
+    openocd -f ../esp32c5-jtag/esp_usb_jtag.ocd -c "adapter speed 6000" -f target/esp32.cfg
+
+In another terminal, from this directory:
+
+    xtensa-esp32-elf-gdb -ex "target extended-remote :3333" -ex "monitor reset halt" build/esp32-idle.elf
+    (gdb) break main.c:14      # the printf in the loop
+    (gdb) continue
+    (gdb) bt
+    (gdb) info locals
+    (gdb) set var n = 1000      # change variables on the chip
+    (gdb) info threads          # FreeRTOS tasks, with backtraces
+    (gdb) monitor resume
+    (gdb) quit
+
+Breakpoints, variable writes and FreeRTOS thread awareness all work through
+the C5 adapter.
+
+**End a session with `monitor resume`.** If GDB quits or detaches while the
+ESP32 is halted, the chip stays halted afterwards and the firmware just stops,
+with no message. Stop OpenOCD with Ctrl+C. Killing it right after GDB detaches
+can also leave the chip halted. If it does get stuck, attach GDB and run
+`monitor resume`, or press EN.
